@@ -12,6 +12,10 @@ all: $(TARGET)
 clean:
 	rm -rf *.o
 
+.PHONY: link
+link:
+	cp frame_buffer_config.hpp ../MikanLoaderPkg
+
 kernel.elf: $(OBJS) Makefile
 	ld.lld $(LDFLAGS) -o kernel.elf $(OBJS)
 

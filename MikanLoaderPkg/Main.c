@@ -8,6 +8,7 @@
 #include  <Protocol/DiskIo2.h>
 #include  <Protocol/BlockIo.h>
 #include  <Guid/FileInfo.h>
+#include  "frame_buffer_config.hpp"
 
 struct MemoryMap {
   UINTN buffer_size;
@@ -83,44 +84,57 @@ EFI_STATUS SaveMemoryMap(struct MemoryMap* map, EFI_FILE_PROTOCOL* file) {
 }
 
 EFI_STATUS OpenRootDir(EFI_HANDLE image_handle, EFI_FILE_PROTOCOL** root) {
+  EFI_STATUS status;
   EFI_LOADED_IMAGE_PROTOCOL* loaded_image;
   EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* fs;
 
-  gBS->OpenProtocol(image_handle,
-                    &gEfiLoadedImageProtocolGuid,
-                    (VOID**)&loaded_image,
-                    image_handle,
-                    NULL,
-                    EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+  status = gBS->OpenProtocol(image_handle,
+                             &gEfiLoadedImageProtocolGuid,
+                             (VOID**)&loaded_image,
+                             image_handle,
+                             NULL,
+                             EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+  if (EFI_ERROR(status)) {
+    return status;
+  }
 
-  gBS->OpenProtocol(loaded_image->DeviceHandle,
-                    &gEfiSimpleFileSystemProtocolGuid,
-                    (VOID**)&fs,
-                    image_handle,
-                    NULL,
-                    EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+  status = gBS->OpenProtocol(loaded_image->DeviceHandle,
+                             &gEfiSimpleFileSystemProtocolGuid,
+                             (VOID**)&fs,
+                             image_handle,
+                             NULL,
+                             EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+  if (EFI_ERROR(status)) {
+    return status;
+  }
 
-  fs->OpenVolume(fs, root);
-
-  return EFI_SUCCESS;
+  return fs->OpenVolume(fs, root);
 }
 
 EFI_STATUS OpenGOP(EFI_HANDLE image_handle,
                    EFI_GRAPHICS_OUTPUT_PROTOCOL** gop) {
+  EFI_STATUS status;
   UINTN num_gop_handles = 0;
   EFI_HANDLE* gop_handles = NULL;
-  gBS->LocateHandleBuffer(ByProtocol,
-                          &gEfiGraphicsOutputProtocolGuid,
-                          NULL,
-                          &num_gop_handles,
-                          &gop_handles);
 
-  gBS->OpenProtocol(gop_handles[0],
-                    &gEfiGraphicsOutputProtocolGuid,
-                    (VOID**)gop,
-                    image_handle,
-                    NULL,
-                    EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+  status = gBS->LocateHandleBuffer(ByProtocol,
+                                   &gEfiGraphicsOutputProtocolGuid,
+                                   NULL,
+                                   &num_gop_handles,
+                                   &gop_handles);
+  if (EFI_ERROR(status)) {
+    return status;
+  }
+
+  status = gBS->OpenProtocol(gop_handles[0],
+                             &gEfiGraphicsOutputProtocolGuid,
+                             (VOID**)gop,
+                             image_handle,
+                             NULL,
+                             EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+  if (EFI_ERROR(status)) {
+    return status;
+  }
 
   FreePool(gop_handles);
 
@@ -260,9 +274,29 @@ EFI_STATUS EFIAPI UefiMain(EFI_HANDLE image_handle,
 
   UINT64 entry_addr = *(UINT64*)(kernel_base_addr + 24);
 
-  typedef void EntryPointType(UINT64, UINT64);
+  struct FrameBufferConfig config = {
+    (UINT8*)gop->Mode->FrameBufferBase,
+    gop->Mode->Info->PixelsPerScanLine,
+    gop->Mode->Info->HorizontalResolution,
+    gop->Mode->Info->VerticalResolution,
+    0
+  };
+  switch (gop->Mode->Info->PixelFormat) {
+    case PixelRedGreenBlueReserved8BitPerColor:
+      config.pixel_format = kPixelRGBResv8BitPerColor;
+      break;
+    case PixelBlueGreenRedReserved8BitPerColor:
+      config.pixel_format = kPixelBGRResv8BitPerColor;
+      break;
+    default:
+      Print(L"Unimplemented pixel format: %d\n",
+            gop->Mode->Info->PixelFormat);
+      Halt();
+  }
+
+  typedef void EntryPointType(const struct FrameBufferConfig*);
   EntryPointType* entry_point = (EntryPointType*)entry_addr;
-  entry_point(gop->Mode->FrameBufferBase, gop->Mode->FrameBufferSize);
+  entry_point(&config);
 
   Print(L"All done\n");
 
