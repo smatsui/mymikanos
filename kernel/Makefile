@@ -1,7 +1,7 @@
 TARGET = kernel.elf
-OBJS = main.o font.o graphics.o
+OBJS = main.o font.o graphics.o hankaku.o
 
-CXXFLAGS += -O2 -Wall -g --target=x86_64-.elf -ffreestanding -mno-red-zone \
+CXXFLAGS += -O2 -Wall -g --target=x86_64-elf -ffreestanding -mno-red-zone \
             -fno-exceptions -fno-rtti -std=c++17
 LDFLAGS += --entry KernelMain -z norelro --image-base 0x100000 --static
 
@@ -22,3 +22,9 @@ kernel.elf: $(OBJS) Makefile
 
 %.o: %.cpp Makefile
 	clang++ $(CPPFLAGS) $(CXXFLAGS) -c $<
+
+hankaku.bin: hankaku.txt
+	../tools/makefont.py -o $@ $<
+
+hankaku.o: hankaku.bin
+	objcopy -I binary -O elf64-x86-64 -B i386:x86-64 $< $@
