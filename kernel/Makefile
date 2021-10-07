@@ -1,6 +1,7 @@
 TARGET = kernel.elf
-OBJS = main.o font.o graphics.o hankaku.o
+OBJS = main.o font.o graphics.o hankaku.o newlib_support.o console.o
 
+CFLAGS   += -O2 -Wall -g --target=x86_64-elf -ffreestanding -mno-red-zone
 CXXFLAGS += -O2 -Wall -g --target=x86_64-elf -ffreestanding -mno-red-zone \
             -fno-exceptions -fno-rtti -std=c++17
 LDFLAGS += --entry KernelMain -z norelro --image-base 0x100000 --static
@@ -18,10 +19,13 @@ link:
 	cp elf.hpp ../MikanLoaderPkg
 
 kernel.elf: $(OBJS) Makefile
-	ld.lld $(LDFLAGS) -o kernel.elf $(OBJS)
+	ld.lld $(LDFLAGS) -o kernel.elf $(OBJS) -lc
 
 %.o: %.cpp Makefile
 	clang++ $(CPPFLAGS) $(CXXFLAGS) -c $<
+
+%.o: %.c Makefile
+	clang $(CPPFLAGS) $(CFLAGS) -c $<
 
 hankaku.bin: hankaku.txt
 	../tools/makefont.py -o $@ $<
