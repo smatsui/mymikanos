@@ -1,5 +1,5 @@
 TARGET = kernel.elf
-OBJS = main.o font.o graphics.o hankaku.o newlib_support.o console.o
+OBJS = main.o font.o graphics.o hankaku.o newlib_support.o console.o pci.o asmfunc.o
 
 CFLAGS   += -O2 -Wall -g --target=x86_64-elf -ffreestanding -mno-red-zone
 CXXFLAGS += -O2 -Wall -g --target=x86_64-elf -ffreestanding -mno-red-zone \
@@ -26,6 +26,9 @@ kernel.elf: $(OBJS) Makefile
 
 %.o: %.c Makefile
 	clang $(CPPFLAGS) $(CFLAGS) -c $<
+
+%.o: %.asm Makefile
+	nasm -f elf64 -o $@ $<
 
 hankaku.bin: hankaku.txt
 	../tools/makefont.py -o $@ $<
