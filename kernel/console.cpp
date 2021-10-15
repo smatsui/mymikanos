@@ -28,8 +28,8 @@ void Console::Newline() {
   if (cursor_row_ < kRows -1) {
     cursor_row_++;
   } else {
-    for (int y = 0; y < 16 * kColumns; y++){
-      for (int x = 0; x < 8 * kRows; x++) {
+    for (int y = 0; y < 16 * kRows; y++){
+      for (int x = 0; x < 8 * kColumns; x++) {
         writer_.Write(x, y, bg_color_);
       }
     }
